@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<!--
+  index.html —— 电车电耗记录 PWA 主页面
+  说明：
+  - 纯静态单页应用（SPA），所有视图在一个页面内通过 [hidden] 切换。
+  - 数据完全保存在本机 IndexedDB（见 js/db.js），不上传任何服务器。
+  - 通过 manifest.webmanifest + sw.js 实现「可安装 / 可离线」的 PWA 能力。
+-->
+<html lang="zh-CN" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <!-- 移动端视口：禁用用户缩放，贴合 App 体验 -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no" />
+  <!-- 状态栏/地址栏主题色（Android Chrome 与 iOS 会取用） -->
+  <meta name="theme-color" content="#10b981" />
+  <!-- 允许作为独立 App 添加到主屏幕（iOS） -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="电耗记录" />
+  <meta name="description" content="本地电车电池电耗记录工具，离线可用，数据仅保存在本机" />
+  <title>电车电耗记录</title>
+  <!-- PWA 清单与图标 -->
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <link rel="icon" href="icons/icon-192.png" />
+  <!-- 全局样式 -->
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <!-- 顶部栏：标题 + 深色模式切换按钮 + 副标题 -->
+  <header class="appbar">
+    <div class="appbar-title">电车电耗记录</div>
+    <!-- 主题切换：🌙=当前浅色（点击切深色），☀️=当前深色（点击切浅色） -->
+    <button class="theme-btn" id="btn-theme" type="button" aria-label="切换深色模式">🌙</button>
+    <div class="appbar-sub">本地 · 离线 · 数据不上传</div>
+  </header>
+
+  <!-- 主内容区：五个视图，初始仅显示「记录」视图（其余 hidden） -->
+  <main id="main">
+    <!-- ========== 视图1：行驶记录列表 ========== -->
+    <section class="view" id="view-records" data-view="records">
+      <div class="view-head">
+        <h2>行驶记录</h2>
+        <div class="head-actions">
+          <!-- 手动刷新按钮（桌面端也能用，移动端另有下拉刷新手势） -->
+          <button class="icon-btn" id="btn-refresh" type="button" aria-label="刷新" title="刷新">⟳</button>
+          <!-- 按车辆筛选 -->
+          <select id="filter-vehicle" class="mini-select"><option value="">全部车辆</option></select>
+        </div>
+      </div>
+      <!-- 概览卡片：记录数 / 平均电耗 / 总里程 -->
+      <div class="hero" id="records-hero">
+        <div class="hero-item"><span>记录数</span><b id="hero-count">0</b></div>
+        <div class="hero-item"><span>平均电耗</span><b id="hero-rate">0</b><i>kWh/100km</i></div>
+        <div class="hero-item"><span>总里程</span><b id="hero-mileage">0</b><i>km</i></div>
+      </div>
+      <!-- 下拉刷新容器：ptr 为刷新提示条，records-list 为列表本体 -->
+      <div class="ptr-wrap">
+        <div class="ptr" id="ptr"><span class="ptr-text">下拉刷新</span></div>
+        <!-- 记录卡片列表（由 js/app.js 动态渲染，分页 5 条/页） -->
+        <div id="records-list" class="list"></div>
+        <!-- 上拉加载更多（有更多数据时显示） -->
+        <button class="btn-ghost block" id="btn-loadmore" type="button" hidden>加载更多</button>
+        <p class="list-end" id="records-end" hidden>— 没有更多了 —</p>
+      </div>
+      <!-- 空状态提示 -->
+      <p id="records-empty" class="empty-tip" hidden>还没有记录，点下方「记一笔」开始吧。</p>
+    </section>
+
+    <!-- ========== 视图2：记一笔（新增记录） ========== -->
+    <section class="view" id="view-add" data-view="add" hidden>
+      <div class="view-head"><h2>记一笔</h2></div>
+      <form id="add-form" class="card form">
+        <label class="field">
+          <span>车辆</span>
+          <!-- 车辆下拉由 js/app.js 填充 -->
+          <select id="add-vehicle" name="vehicleId" required></select>
+        </label>
+        <!-- 未添加车辆时的引导提示 -->
+        <p id="no-vehicle-tip" class="warn-tip" hidden>请先在「车辆」里添加一辆车。</p>
+
+        <label class="field">
+          <span>日期时间</span>
+          <input type="datetime-local" id="add-date" name="date" required />
+        </label>
+
+        <!-- 只读展示：所选车辆的满电电量（用于电耗计算） -->
+        <div class="readonly-row">
+          <span>满电电量</span>
+          <b id="add-capacity">—</b><i>kWh</i>
+        </div>
+
+        <label class="field">
+          <span>初始电量 (%)</span>
+          <input type="number" id="add-init" name="initPct" inputmode="decimal" min="0" max="100" step="0.1" placeholder="如 100" required />
+        </label>
+
+        <label class="field">
+          <span>剩余电量 (%)</span>
+          <input type="number" id="add-remain" name="remainPct" inputmode="decimal" min="0" max="100" step="0.1" placeholder="如 45" required />
+        </label>
+
+        <label class="field">
+          <span>行驶里程 (km)</span>
+          <input type="number" id="add-mileage" name="mileage" inputmode="decimal" min="0" step="0.1" placeholder="如 120" required />
+        </label>
+
+        <label class="field">
+          <span>备注（可选）</span>
+          <input type="text" id="add-note" name="note" placeholder="如 市区通勤" maxlength="60" />
+        </label>
+
+        <!-- 实时计算结果：消耗电量 + 电耗 -->
+        <div class="calc-box" id="calc-box">
+          <div class="calc-item">
+            <span>消耗电量</span><b id="calc-energy">—</b><i>kWh</i>
+          </div>
+          <div class="calc-item highlight">
+            <span>电耗</span><b id="calc-rate">—</b><i>kWh/100km</i>
+          </div>
+        </div>
+        <!-- 公式校验提示：初始<剩余时显示，阻止提交负电耗 -->
+        <p class="calc-warn" id="calc-warn" hidden>⚠ 初始电量需高于剩余电量，否则电耗为负</p>
+
+        <button type="submit" class="btn-primary" id="add-submit">保存记录</button>
+      </form>
+    </section>
+
+    <!-- ========== 视图3：我的车辆（增删改） ========== -->
+    <section class="view" id="view-vehicles" data-view="vehicles" hidden>
+      <div class="view-head"><h2>我的车辆</h2></div>
+      <form id="vehicle-form" class="card form">
+        <input type="hidden" id="veh-id" />
+        <label class="field">
+          <span>名称</span>
+          <input type="text" id="veh-name" placeholder="如 特斯拉 Model 3" maxlength="40" required />
+        </label>
+        <label class="field">
+          <span>满电电量 (kWh)</span>
+          <input type="number" id="veh-capacity" inputmode="decimal" min="0" step="0.1" placeholder="如 60" required />
+        </label>
+        <label class="field">
+          <span>默认初始电量 (%)</span>
+          <input type="number" id="veh-init" inputmode="decimal" min="0" max="100" step="0.1" placeholder="如 100" required />
+        </label>
+        <div class="btn-row">
+          <button type="submit" class="btn-primary" id="veh-submit">保存车辆</button>
+          <button type="button" class="btn-ghost" id="veh-reset">清空</button>
+        </div>
+      </form>
+      <!-- 车辆列表（由 js/app.js 渲染，含编辑/删除） -->
+      <div id="vehicles-list" class="list"></div>
+    </section>
+
+    <!-- ========== 视图4：统计 ========== -->
+    <section class="view" id="view-stats" data-view="stats" hidden>
+      <div class="view-head"><h2>统计</h2></div>
+      <!-- 四个核心数字卡片 -->
+      <div class="stats-grid">
+        <div class="stat-card"><span>总里程</span><b id="stat-mileage">0</b><i>km</i></div>
+        <div class="stat-card"><span>总耗电</span><b id="stat-energy">0</b><i>kWh</i></div>
+        <div class="stat-card highlight"><span>平均电耗</span><b id="stat-rate">0</b><i>kWh/100km</i></div>
+        <div class="stat-card"><span>记录数</span><b id="stat-count">0</b><i>条</i></div>
+      </div>
+
+      <!-- 电耗趋势图（纯 SVG，由 js/app.js 渲染，按月/按周切换） -->
+      <div class="card">
+        <div class="chart-head">
+          <h3>电耗趋势</h3>
+          <div class="seg" id="chart-toggle">
+            <button type="button" data-chart="month" class="active">按月</button>
+            <button type="button" data-chart="week">按周</button>
+          </div>
+        </div>
+        <div class="chart-box" id="chart"></div>
+      </div>
+
+      <!-- 各车辆累计表现 -->
+      <div id="stat-by-vehicle" class="list"></div>
+    </section>
+
+    <!-- ========== 视图5：备份与同步 ========== -->
+    <section class="view" id="view-backup" data-view="backup" hidden>
+      <div class="view-head"><h2>备份与同步</h2></div>
+      <div class="card">
+        <p class="hint">所有数据仅保存在本机 IndexedDB，不会上传任何服务器。</p>
+        <!-- 导出完整 JSON 备份 -->
+        <button type="button" class="btn-primary block" id="btn-export">导出备份 (JSON)</button>
+        <p class="hint small">完整备份（含车辆与全部记录），可拷贝到电脑或云盘自行保存。</p>
+        <hr class="sep" />
+        <!-- 导出 CSV（Excel 可打开） -->
+        <button type="button" class="btn-secondary block" id="btn-export-csv">导出 CSV（Excel 可打开）</button>
+        <p class="hint small">标准表格，方便在 Excel / 表格软件中做深度分析或报销。</p>
+        <hr class="sep" />
+        <div class="btn-row">
+          <!-- 导入 JSON / CSV（合并模式） -->
+          <button type="button" class="btn-secondary" id="btn-import">导入 JSON（合并）</button>
+          <button type="button" class="btn-secondary" id="btn-import-csv">导入 CSV（合并）</button>
+        </div>
+        <input type="file" id="import-file" accept="application/json,.json" hidden />
+        <input type="file" id="import-csv-file" accept=".csv,text/csv" hidden />
+        <p class="hint small">支持导入 Excel / CSV 数据（合并模式：追加，不删已有）。</p>
+        <hr class="sep" />
+        <div class="btn-row">
+          <!-- 生成月度 / 年度报告长图（PNG） -->
+          <button type="button" class="btn-ghost" id="btn-report-month">月度报告长图</button>
+          <button type="button" class="btn-ghost" id="btn-report-year">年度报告长图</button>
+        </div>
+        <p class="hint small">生成本期用车报告长图（PNG），便于分享到社交媒体。</p>
+        <hr class="sep" />
+        <!-- 清空全部数据（危险操作，二次确认） -->
+        <button type="button" class="btn-danger block" id="btn-clear">清空全部数据</button>
+        <p class="hint small warn">危险操作，会删除本机全部车辆与记录，不可恢复。</p>
+      </div>
+
+      <!-- 多设备同步引导（WebDAV 等自托管方案） -->
+      <details class="card sync-guide">
+        <summary>多设备同步 / 网盘方案（WebDAV 等）</summary>
+        <div class="guide-body">
+          <p>本应用默认纯本地存储（IndexedDB），不联网。如需在多设备间同步，可用以下自托管思路：</p>
+          <ol>
+            <li><b>手动导出 / 导入</b>：在每台设备用「导出 CSV / JSON」备份，再在另一台「导入」合并。简单可靠，适合偶尔同步。</li>
+            <li><b>WebDAV 网盘</b>：将导出的 JSON/CSV 文件存入支持 WebDAV 的网盘（如 Nextcloud、群晖 NAS、InfiniCLOUD 等）。进阶用户可在此基础上自行编写同步脚本（定时导出 → 上传 WebDAV → 其他设备拉取导入）。</li>
+            <li><b>进阶自托管</b>：把项目部署到自己的静态服务器，配合定时任务做备份归档。本仓库为纯前端，无后端，数据主权始终在你手中。</li>
+          </ol>
+          <p class="hint small">提示：导入均为「合并」模式，重复数据按 ID 去重，可安全多次同步。</p>
+        </div>
+      </details>
+
+      <!-- 安装到主屏幕引导（仅当浏览器支持安装时显示，见 js/app.js） -->
+      <div class="card install-tip" id="install-tip" hidden>
+        <p>可将本应用「添加到主屏幕」，像 App 一样离线使用。</p>
+        <button type="button" class="btn-ghost block" id="btn-install">安装到主屏幕</button>
+      </div>
+    </section>
+  </main>
+
+  <!-- 底部导航栏（五个视图切换） -->
+  <nav class="tabbar">
+    <button class="tab" data-target="records"><i class="ic">📋</i><span>记录</span></button>
+    <button class="tab" data-target="add"><i class="ic">➕</i><span>记一笔</span></button>
+    <button class="tab" data-target="vehicles"><i class="ic">🚗</i><span>车辆</span></button>
+    <button class="tab" data-target="stats"><i class="ic">📊</i><span>统计</span></button>
+    <button class="tab" data-target="backup"><i class="ic">💾</i><span>备份</span></button>
+  </nav>
+
+  <!-- 通用删除确认弹窗（自定义 modal，由 js/app.js 的 confirmDialog() 控制显隐） -->
+  <div class="modal-mask" id="confirm-modal" hidden>
+    <div class="modal" role="dialog" aria-modal="true">
+      <h3 id="confirm-title">提示</h3>
+      <p id="confirm-msg"></p>
+      <div class="modal-actions">
+        <button type="button" class="btn-ghost" id="confirm-cancel">取消</button>
+        <button type="button" class="btn-primary" id="confirm-ok">确定</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 轻提示 toast（由 js/app.js 的 toast() 控制） -->
+  <div id="toast" class="toast" hidden></div>
+
+  <!-- 脚本：先加载数据层 db.js，再加载主逻辑 app.js -->
+  <script src="js/db.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

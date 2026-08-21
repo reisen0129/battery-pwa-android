@@ -1,0 +1,600 @@
+/* ============================================================
+   styles.css —— 电车电耗记录 PWA 全局样式
+   设计语言：emerald（翡翠绿）主色 + 柔和卡片阴影 + 大圆角
+   支持浅色（默认）与深色（:root[data-theme="dark"]）两套主题
+   ============================================================ */
+
+/* 浅色主题的设计变量（颜色、圆角、阴影、尺寸等集中管理） */
+:root {
+  --green: #10b981;          /* 主色：标准翡翠绿 */
+  --green-2: #34d399;        /* 主色浅调：用于渐变起点 */
+  --green-dark: #059669;     /* 主色深调 */
+  --green-darker: #047857;   /* 主色更深：用于文字/强调 */
+  --green-light: #ecfdf5;    /* 主色极浅：背景/高亮块 */
+  --green-xlight: #f0fdf9;   /* 主色超浅：只读行底色 */
+  --amber: #d97706;          /* 警示/接近目标色（黄） */
+  --bg: #eef2f5;             /* 页面背景 */
+  --bg-grad: radial-gradient(1100px 520px at 50% -12%, #e7f8f0 0%, #eef2f5 52%); /* 顶部柔光背景 */
+  --card: #ffffff;           /* 卡片背景 */
+  --text: #14202b;           /* 主文字色 */
+  --muted: #6b7886;          /* 次要/说明文字 */
+  --line: #e6ecf1;           /* 分隔线/边框 */
+  --danger: #e23b3b;         /* 危险操作色（红） */
+  --danger-bg: #fdecec;      /* 危险操作背景 */
+  --radius: 20px;            /* 大圆角（卡片） */
+  --radius-sm: 13px;         /* 小圆角（输入框/按钮） */
+  --shadow: 0 8px 24px rgba(16, 32, 48, 0.08);   /* 卡片阴影 */
+  --shadow-sm: 0 2px 10px rgba(16, 32, 48, 0.05); /* 轻阴影 */
+  --tab-h: 66px;             /* 底部导航高度 */
+  --safe-b: env(safe-area-inset-bottom, 0px); /* iPhone 底部安全区 */
+  --safe-t: env(safe-area-inset-top, 0px);     /* iPhone 顶部安全区 */
+}
+
+/* 深色主题：覆盖上述变量（仅改色值，布局不变） */
+:root[data-theme="dark"] {
+  --green: #34d399;
+  --green-2: #6ee7b7;
+  --green-dark: #10b981;
+  --green-darker: #34d399;
+  --green-light: #0f3b30;
+  --green-xlight: #0c2c24;
+  --amber: #fbbf24;
+  --bg: #0b1220;
+  --bg-grad: radial-gradient(1100px 520px at 50% -12%, #0e2a22 0%, #0b1220 55%);
+  --card: #15202e;
+  --text: #e6edf3;
+  --muted: #93a1b0;
+  --line: #25323f;
+  --danger: #f87171;
+  --danger-bg: #3a1d1d;
+  --shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  --shadow-sm: 0 2px 10px rgba(0, 0, 0, 0.35);
+}
+
+/* 全局盒模型与点击高亮清零 */
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+/* 关键修复：显式 display 的样式（如 .modal-mask{display:flex}）会覆盖
+   HTML 的 hidden 属性默认的 display:none。加此全局规则强制恢复 hidden 语义，
+   否则确认弹窗/ toast / 空态等带 hidden 的浮层会一进页面就显示。 */
+[hidden] { display: none !important; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  background-image: var(--bg-grad);
+  background-attachment: fixed;
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", Roboto, "Helvetica Neue", sans-serif;
+  font-size: 16px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+/* 数字使用等宽字形，避免跳动 */
+b { font-variant-numeric: tabular-nums; }
+
+/* ===== 顶栏 ===== */
+.appbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: linear-gradient(135deg, var(--green) 0%, var(--green-darker) 100%);
+  color: #fff;
+  padding: calc(var(--safe-t) + 18px) 20px 18px;
+  box-shadow: 0 8px 22px rgba(5, 150, 105, 0.30);
+  overflow: hidden;
+}
+/* 顶栏右上角柔光装饰 */
+.appbar::after {
+  content: "";
+  position: absolute;
+  right: -50px; top: -70px;
+  width: 200px; height: 200px;
+  background: radial-gradient(circle, rgba(255,255,255,0.16), transparent 70%);
+  pointer-events: none;
+}
+.appbar-title { font-size: 22px; font-weight: 800; letter-spacing: 0.4px; }
+.appbar-sub { font-size: 12.5px; opacity: 0.92; margin-top: 4px; font-weight: 500; }
+/* 主题切换按钮（🌙/☀️） */
+.theme-btn {
+  position: absolute;
+  right: 16px; top: calc(var(--safe-t) + 14px);
+  width: 38px; height: 38px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.2);
+  color: #fff;
+  font-size: 18px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: transform 0.12s, background 0.15s;
+}
+.theme-btn:active { transform: scale(0.92); background: rgba(255,255,255,0.32); }
+
+/* ===== 主区域 ===== */
+#main {
+  padding: 18px 15px calc(var(--tab-h) + var(--safe-b) + 22px);
+  max-width: 720px;
+  margin: 0 auto;
+}
+/* 视图切换时的淡入动画 */
+.view { animation: fade 0.25s ease both; }
+@keyframes fade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+.view-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 4px 4px 14px;
+}
+.view-head h2 {
+  font-size: 20px;
+  margin: 0;
+  font-weight: 800;
+  position: relative;
+  padding-left: 13px;
+}
+/* 标题前的绿色竖条装饰 */
+.view-head h2::before {
+  content: "";
+  position: absolute;
+  left: 0; top: 50%;
+  transform: translateY(-50%);
+  width: 5px; height: 19px;
+  border-radius: 3px;
+  background: linear-gradient(var(--green-2), var(--green-darker));
+}
+.head-actions { display: flex; align-items: center; gap: 8px; }
+/* 圆形图标按钮（刷新等） */
+.icon-btn {
+  width: 38px; height: 38px;
+  border: 1.5px solid var(--line);
+  background: var(--card);
+  border-radius: 12px;
+  font-size: 18px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text);
+  transition: transform 0.12s, filter 0.12s;
+}
+.icon-btn:active { transform: scale(0.94); filter: brightness(0.95); }
+
+/* ===== 卡片 / 表单 ===== */
+.card {
+  background: var(--card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 20px;
+  margin-bottom: 14px;
+  border: 1px solid rgba(255,255,255,0.06);
+}
+.form { display: flex; flex-direction: column; gap: 16px; }
+
+.field { display: flex; flex-direction: column; gap: 7px; }
+.field > span { font-size: 13.5px; color: var(--muted); font-weight: 700; letter-spacing: 0.2px; }
+
+/* 输入框 / 下拉框统一外观（去除原生外观，统一圆角） */
+input, select {
+  width: 100%;
+  font-size: 17px;
+  padding: 13px 14px;
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: #f7fafc;
+  color: var(--text);
+  appearance: none;
+  -webkit-appearance: none;
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+}
+:root[data-theme="dark"] input, :root[data-theme="dark"] select {
+  background: #0f1825;
+}
+input::placeholder { color: #aab4bf; }
+/* 聚焦态：绿色描边 + 浅绿光晕 */
+input:focus, select:focus {
+  outline: none;
+  border-color: var(--green);
+  background: #fff;
+  box-shadow: 0 0 0 4px var(--green-light);
+}
+:root[data-theme="dark"] input:focus, :root[data-theme="dark"] select:focus { background: #15202e; }
+
+/* 「满电电量」只读信息行 */
+.readonly-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: linear-gradient(135deg, var(--green-xlight), var(--green-light));
+  border: 1px solid #cdeeda;
+  border-radius: var(--radius-sm);
+  padding: 13px 15px;
+  color: var(--green-darker);
+}
+:root[data-theme="dark"] .readonly-row { border-color: #14503f; }
+.readonly-row > span { font-size: 14px; font-weight: 700; }
+.readonly-row > b { font-size: 20px; font-weight: 800; margin-left: auto; }
+.readonly-row > i { font-style: normal; font-size: 13px; opacity: 0.85; }
+
+/* 公式校验警告（初始<剩余时显示） */
+.calc-warn {
+  margin: 2px 0 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--danger);
+  background: var(--danger-bg);
+  border-radius: 10px;
+  padding: 9px 12px;
+}
+
+/* ===== 计算框 ===== */
+.calc-box { display: flex; gap: 12px; margin-top: 2px; }
+.calc-item {
+  flex: 1;
+  background: #f4f7fa;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 14px 10px;
+  text-align: center;
+}
+:root[data-theme="dark"] .calc-item { background: #1b2735; }
+/* 电耗项用主色渐变高亮 */
+.calc-item.highlight {
+  background: linear-gradient(135deg, var(--green) 0%, var(--green-darker) 100%);
+  border: none;
+  box-shadow: 0 8px 18px rgba(16, 185, 129, 0.32);
+}
+.calc-item > span { display: block; font-size: 12.5px; color: var(--muted); font-weight: 700; }
+.calc-item > b { display: block; font-size: 26px; font-weight: 800; color: var(--text); margin: 4px 0 2px; }
+.calc-item.highlight > b { color: #fff; }
+.calc-item > i { font-style: normal; font-size: 11.5px; color: var(--muted); }
+.calc-item.highlight > i { color: rgba(255,255,255,0.85); }
+
+/* ===== 按钮 ===== */
+.btn-primary, .btn-secondary, .btn-danger, .btn-ghost {
+  border: none;
+  border-radius: 14px;
+  font-size: 16px;
+  font-weight: 800;
+  padding: 15px;
+  cursor: pointer;
+  width: 100%;
+  transition: transform 0.08s ease, filter 0.15s ease, box-shadow 0.15s;
+  letter-spacing: 0.3px;
+}
+/* 主按钮：绿色渐变，带阴影 */
+.btn-primary {
+  background: linear-gradient(135deg, var(--green-2) 0%, var(--green-darker) 100%);
+  color: #fff;
+  box-shadow: 0 6px 16px rgba(16, 185, 129, 0.35);
+}
+.btn-primary:active { transform: translateY(1px) scale(0.99); filter: brightness(0.97); }
+.btn-primary:disabled { background: #c4ccd3; box-shadow: none; cursor: not-allowed; }
+.btn-secondary { background: #eef2f6; color: var(--text); border: 1px solid var(--line); }
+:root[data-theme="dark"] .btn-secondary { background: #1b2735; }
+.btn-danger { background: var(--danger-bg); color: var(--danger); }
+.btn-ghost { background: transparent; color: var(--muted); border: 1.5px solid var(--line); }
+.btn-primary.block, .btn-secondary.block, .btn-danger.block, .btn-ghost.block { display: block; }
+.btn-row { display: flex; gap: 10px; }
+.btn-row .btn-primary { flex: 2; }
+.btn-row .btn-ghost { flex: 1; }
+.btn-row .btn-secondary { flex: 1; }
+
+/* ===== 列表 / 下拉刷新 / 分页 ===== */
+.list { display: flex; flex-direction: column; gap: 12px; }
+.empty-tip, .warn-tip {
+  text-align: center;
+  color: var(--muted);
+  padding: 32px 14px;
+  font-size: 15px;
+  background: var(--card);
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+}
+.warn-tip { color: var(--danger); background: var(--danger-bg); border: 1px solid #f6cfcf; border-radius: var(--radius-sm); margin: 0; }
+
+/* 下拉刷新容器与提示条 */
+.ptr-wrap { overflow: hidden; }
+.ptr {
+  height: 0;               /* 默认 0，下拉时由 js 动态撑高 */
+  overflow: hidden;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  transition: height 0.18s ease;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+.ptr-text { padding-bottom: 8px; }
+.list-end { text-align: center; color: var(--muted); font-size: 13px; padding: 14px 0 4px; }
+
+/* 记录卡片 */
+.rec-item {
+  background: var(--card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 15px 16px 14px;
+  position: relative;
+  border-left: 5px solid var(--green);
+  overflow: hidden;
+}
+.rec-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.rec-title { display: flex; align-items: center; gap: 8px; min-width: 0; }
+/* 车辆色点 */
+.rec-dot {
+  width: 9px; height: 9px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--green-2), var(--green-dark));
+  flex-shrink: 0;
+}
+.rec-veh { font-weight: 800; font-size: 16.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rec-date { font-size: 12.5px; color: var(--muted); margin-bottom: 12px; }
+.rec-grid {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr 1fr;
+  gap: 8px;
+  text-align: center;
+}
+.rec-cell {
+  background: #f6f9fb;
+  border-radius: 12px;
+  padding: 9px 4px;
+}
+:root[data-theme="dark"] .rec-cell { background: #1b2735; }
+.rec-cell > span { display: block; font-size: 11.5px; color: var(--muted); font-weight: 700; }
+.rec-cell > b { font-size: 16.5px; font-weight: 800; }
+/* 电耗格高亮 */
+.rec-cell.rate {
+  background: linear-gradient(135deg, var(--green-xlight), var(--green-light));
+}
+.rec-cell.rate > b { color: var(--green-darker); font-size: 18px; }
+/* 电耗颜色语义：低于平均=绿（高效）/高于平均=红（费电）/接近平均=黄 */
+.rate-good { color: var(--green-darker) !important; }
+.rate-bad { color: var(--danger) !important; }
+.rate-near { color: var(--amber) !important; }
+.rec-note { font-size: 13px; color: var(--muted); margin-top: 10px; }
+.rec-note b.rate-good, .rec-note b.rate-bad, .rec-note b.rate-near { font-weight: 800; }
+.rec-warn { color: var(--danger); font-weight: 700; }
+/* 删除按钮（×） */
+.del-btn {
+  flex-shrink: 0;
+  background: var(--danger-bg);
+  color: var(--danger);
+  border: none;
+  border-radius: 10px;
+  font-size: 14px;
+  line-height: 1;
+  font-weight: 800;
+  width: 30px; height: 30px;
+  cursor: pointer;
+  transition: filter 0.12s, transform 0.08s;
+}
+.del-btn:active { filter: brightness(0.94); transform: scale(0.94); }
+
+/* 车辆卡片 */
+.veh-item {
+  background: var(--card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 15px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+.veh-info > b { font-size: 16.5px; font-weight: 800; }
+.veh-info > span { display: block; font-size: 13px; color: var(--muted); margin-top: 3px; }
+.veh-actions { display: flex; gap: 8px; flex-shrink: 0; }
+.veh-actions button {
+  border: 1.5px solid var(--line);
+  background: #fff;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 9px 13px;
+  cursor: pointer;
+  transition: filter 0.12s, transform 0.08s;
+}
+:root[data-theme="dark"] .veh-actions button { background: #1b2735; }
+.veh-actions button:active { transform: scale(0.96); }
+.veh-actions .edit { color: var(--green-darker); border-color: #cdeeda; }
+.veh-actions .del { color: var(--danger); border-color: #f4cccc; }
+
+/* ===== 统计 ===== */
+.hero {
+  display: flex;
+  background: linear-gradient(135deg, var(--green) 0%, var(--green-darker) 100%);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 20px 14px;
+  margin-bottom: 14px;
+  color: #fff;
+}
+.hero-item { flex: 1; text-align: center; position: relative; }
+.hero-item + .hero-item::before {
+  content: "";
+  position: absolute; left: 0; top: 15%;
+  height: 70%; width: 1px; background: rgba(255,255,255,0.25);
+}
+.hero-item > span { display: block; font-size: 12px; opacity: 0.92; font-weight: 700; }
+.hero-item > b { display: block; font-size: 27px; font-weight: 800; margin: 3px 0 1px; }
+.hero-item > i { font-style: normal; font-size: 11px; opacity: 0.8; }
+
+.stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+.stat-card {
+  background: var(--card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 18px 14px;
+  text-align: center;
+}
+/* 平均电耗卡片高亮 */
+.stat-card.highlight {
+  background: linear-gradient(135deg, var(--green-2) 0%, var(--green-darker) 100%);
+  color: #fff;
+  box-shadow: 0 8px 20px rgba(16, 185, 129, 0.35);
+}
+.stat-card > span { font-size: 13px; opacity: 0.85; font-weight: 700; }
+.stat-card > b { display: block; font-size: 28px; font-weight: 800; margin: 5px 0 2px; }
+.stat-card > i { font-style: normal; font-size: 12px; opacity: 0.8; }
+.stat-veh {
+  background: var(--card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 16px;
+  margin-bottom: 12px;
+}
+.stat-veh > b { display: block; font-size: 15.5px; font-weight: 800; margin-bottom: 8px; }
+.stat-veh .row { display: flex; justify-content: space-between; font-size: 14px; color: var(--muted); padding: 4px 0; border-bottom: 1px dashed var(--line); }
+.stat-veh .row:last-child { border-bottom: none; }
+.stat-veh .row > b { color: var(--text); }
+
+/* 趋势图（SVG） */
+.chart-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.chart-head h3 { margin: 0; font-size: 16px; font-weight: 800; }
+/* 按月/按周切换分段控件 */
+.seg { display: inline-flex; background: #eef2f6; border-radius: 10px; padding: 3px; }
+:root[data-theme="dark"] .seg { background: #1b2735; }
+.seg button {
+  border: none; background: none; cursor: pointer;
+  font-size: 13px; font-weight: 700; color: var(--muted);
+  padding: 7px 14px; border-radius: 8px; transition: all 0.15s;
+}
+.seg button.active { background: var(--card); color: var(--green-darker); box-shadow: var(--shadow-sm); }
+.chart-box { min-height: 120px; }
+.chart-svg { width: 100%; height: auto; display: block; }
+.ch-grid { stroke: var(--line); stroke-width: 1; }
+.ch-yl, .ch-xl { fill: var(--muted); font-size: 11px; }
+.ch-yl { text-anchor: end; }
+.ch-xl { text-anchor: middle; }
+.ch-area { fill: var(--green-light); opacity: 0.6; }
+.ch-line { fill: none; stroke: var(--green); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+.ch-pt { fill: var(--green); stroke: var(--card); stroke-width: 2; }
+
+/* ===== 备份区 ===== */
+.hint { font-size: 13px; color: var(--muted); margin: 0 0 12px; line-height: 1.55; }
+.hint.small { font-size: 12px; margin: 9px 0 0; }
+.hint.warn { color: var(--danger); }
+.sep { border: none; border-top: 1px solid var(--line); margin: 18px 0; }
+.install-tip { margin-top: 14px; background: var(--green-xlight); border: 1px solid #cdeeda; }
+:root[data-theme="dark"] .install-tip { background: var(--green-light); border-color: #14503f; }
+
+/* 同步引导（<details>） */
+.sync-guide { padding: 0; overflow: hidden; }
+.sync-guide > summary {
+  list-style: none; cursor: pointer;
+  padding: 18px 20px; font-weight: 800; font-size: 15px;
+  display: flex; align-items: center; gap: 8px;
+}
+.sync-guide > summary::-webkit-details-marker { display: none; }
+.sync-guide > summary::before { content: "🔗"; }
+.guide-body { padding: 0 20px 18px; }
+.guide-body p { font-size: 13.5px; color: var(--muted); line-height: 1.6; margin: 0 0 10px; }
+.guide-body ol { margin: 0; padding-left: 20px; }
+.guide-body li { font-size: 13.5px; color: var(--muted); line-height: 1.6; margin-bottom: 8px; }
+.guide-body b { color: var(--text); }
+
+/* ===== 确认弹窗 ===== */
+/* 注意：此处 display:flex 会覆盖 hidden，必须依赖全局 [hidden]{display:none!important} 才能隐藏 */
+.modal-mask {
+  position: fixed; inset: 0; z-index: 60;
+  background: rgba(8, 14, 22, 0.55);
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+  animation: maskIn 0.18s ease;
+}
+@keyframes maskIn { from { opacity: 0; } to { opacity: 1; } }
+.modal {
+  background: var(--card);
+  border-radius: 18px;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.35);
+  width: 100%; max-width: 340px;
+  padding: 22px 20px 16px;
+  animation: modalIn 0.2s ease;
+}
+@keyframes modalIn { from { opacity: 0; transform: translateY(14px) scale(0.97); } to { opacity: 1; transform: none; } }
+.modal h3 { margin: 0 0 10px; font-size: 18px; font-weight: 800; }
+.modal p { margin: 0 0 18px; font-size: 14.5px; color: var(--muted); line-height: 1.55; }
+.modal-actions { display: flex; gap: 10px; }
+.modal-actions .btn-ghost, .modal-actions .btn-primary { flex: 1; padding: 13px; font-size: 15px; }
+/* 危险确认按钮（删除类）用红色渐变 */
+.btn-primary.danger { background: linear-gradient(135deg, #f87171, #dc2626); box-shadow: 0 6px 16px rgba(220,38,38,0.32); }
+
+/* ===== 底部导航 ===== */
+.tabbar {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  height: calc(var(--tab-h) + var(--safe-b));
+  padding-bottom: var(--safe-b);
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: saturate(180%) blur(12px);
+  -webkit-backdrop-filter: saturate(180%) blur(12px);
+  border-top: 1px solid var(--line);
+  display: flex;
+  z-index: 30;
+  box-shadow: 0 -4px 16px rgba(16, 32, 48, 0.06);
+}
+:root[data-theme="dark"] .tabbar { background: rgba(16, 24, 36, 0.94); }
+.tab {
+  flex: 1;
+  border: none;
+  background: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  color: #98a4b0;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  position: relative;
+  transition: color 0.15s;
+}
+.tab .ic { font-size: 21px; line-height: 1; transition: transform 0.15s; }
+.tab.active { color: var(--green-darker); font-weight: 800; }
+.tab.active .ic { transform: translateY(-1px) scale(1.08); }
+/* 激活态底部小横条 */
+.tab::after {
+  content: "";
+  position: absolute;
+  bottom: 8px;
+  width: 0; height: 3px;
+  border-radius: 2px;
+  background: var(--green);
+  transition: width 0.2s ease;
+}
+.tab.active::after { width: 24px; }
+
+/* ===== Toast 轻提示 ===== */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--tab-h) + var(--safe-b) + 18px);
+  transform: translateX(-50%);
+  background: rgba(20, 32, 43, 0.94);
+  color: #fff;
+  padding: 12px 20px;
+  border-radius: 24px;
+  font-size: 14px;
+  font-weight: 600;
+  z-index: 50;
+  max-width: 86%;
+  text-align: center;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  animation: toastIn 0.22s ease;
+}
+:root[data-theme="dark"] .toast { background: rgba(230, 237, 243, 0.96); color: #0b1220; }
+@keyframes toastIn { from { opacity: 0; transform: translate(-50%, 12px); } to { opacity: 1; transform: translate(-50%, 0); } }
+
+/* 车辆筛选迷你下拉 */
+.mini-select { width: auto; min-width: 116px; font-size: 14px; padding: 9px 12px; background: #fff; }
+:root[data-theme="dark"] .mini-select { background: #0f1825; }
